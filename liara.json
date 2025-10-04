@@ -4,5 +4,18 @@
 "build":{
 "location":"iran"
 },
-"disks":[]
+"disks":[],
+
+  "nginx": {
+    "locations": {
+      "/api/": {
+        "proxy": "https://soodcity.liara.run",
+        "proxy_set_headers": {
+          "Host": "$host",
+          "X-Real-IP": "$remote_addr"
+        }
+      }
+    }
+  }
+
 }
