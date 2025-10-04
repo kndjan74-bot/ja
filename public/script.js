@@ -769,23 +769,21 @@
             }
         }
 
-        // --- API ---
-        // --- API ---
+       // --- API ---
 const getApiBaseUrl = () => {
   const host = window.location.hostname;
   
-  // اگر از دامنه اصلی استفاده می‌شود
-  if (host === 'soodcity.ir' || host === 'www.soodcity.ir') {
+  // اگر از دامنه اصلی یا لوکال استفاده می‌شود
+  if (host === 'soodcity.ir' || host === 'www.soodcity.ir' || host === 'localhost' || host === '127.0.0.1') {
     return '/api';  // از relative path استفاده کن
-  } 
-  // اگر از دامنه liara استفاده می‌شود
+  }
+  // در غیر این صورت، از دامنه liara استفاده کن
   else {
     return 'https://soodcity.liara.run/api';
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
-
         const api = {
             async _fetch(url, options = {}) {
                 const token = localStorage.getItem('token');
@@ -889,9 +887,7 @@ const API_BASE_URL = getApiBaseUrl();
             async getAllAds() {
                 return { success: true, ads: [] };
             },
-            async getAllConnections() {
-                return { success: true, connections: [] };
-            },
+            async getAllConnections() { return this._fetch(`${API_BASE_URL}/connections`); },
             async getAllMessages() {
                 return { success: true, messages: [] };
             }
@@ -2655,6 +2651,7 @@ function refreshAllMapMarkers() {
             }
 
             // --- Part 2: Update the list of current connections ---
+            const myConnections = connections.filter(c => c.sourceId === currentUser.id && c.sourceRole === 'driver');
             if (myConnections.length === 0) {
                 currentConnectionsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">هنوز اتصالی برقرار نشده است.</p>';
             } else {
@@ -2768,6 +2765,7 @@ function refreshAllMapMarkers() {
 
             // --- Part 3: Update the list of current connections ---
             const currentConnectionsContainer = document.getElementById('greenhouse-current-connections');
+            const myConnections = connections.filter(c => c.sourceId === currentUser.id && c.sourceRole === 'greenhouse');
             if (myConnections.length === 0) {
                 currentConnectionsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">هنوز اتصالی برقرار نشده است.</p>';
             } else {
