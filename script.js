@@ -783,7 +783,11 @@ const API_BASE_URL = 'https://soodcity.liara.run/api';
                 }
 
                 try {
-                    const response = await fetch(url, { ...options, headers });
+                     const response = await fetch(url, { 
+                ...options, 
+                headers,
+                credentials: 'include'  // ✅ فقط این خط را اضافه کنید
+            });
                     const data = await response.json();
                     if (!response.ok) {
                         return { success: false, message: data.msg || data.message || `خطای سرور: ${response.status}` };
