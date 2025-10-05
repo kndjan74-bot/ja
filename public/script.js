@@ -454,7 +454,7 @@
             if (!currentUser) return;
 
             if (confirm('آیا مطمئن هستیذ؟ این عمل غیرقابل بازگشت است.')) {
-                const response = await api.deleteAccount(currentUser.id);
+                const response = await api.deleteAccount();
                 if (response.success) {
                     showToast('حساب کاربری شما با موفقیت حذف شد', 'info');
                     // The logout function handles clearing local state
@@ -770,7 +770,6 @@
        // --- API ---
 const API_BASE_URL = 'https://soodcity.liara.run/api';
 
-
         const api = {
             async _fetch(url, options = {}) {
                 const token = localStorage.getItem('token');
@@ -783,11 +782,7 @@ const API_BASE_URL = 'https://soodcity.liara.run/api';
                 }
 
                 try {
-                     const response = await fetch(url, { 
-                ...options, 
-                headers,
-                credentials: 'include'  // ✅ فقط این خط را اضافه کنید
-            });
+                    const response = await fetch(url, { ...options, headers });
                     const data = await response.json();
                     if (!response.ok) {
                         return { success: false, message: data.msg || data.message || `خطای سرور: ${response.status}` };
@@ -846,8 +841,8 @@ const API_BASE_URL = 'https://soodcity.liara.run/api';
             async createConnection(targetId) {
                 return this._fetch(`${API_BASE_URL}/connections`, { method: 'POST', body: JSON.stringify({ targetId }) });
             },
-            async updateConnection(connectionId, status) {
-                 return this._fetch(`${API_BASE_URL}/connections/${connectionId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+            async updateConnection(connectionId, updates) {
+                 return this._fetch(`${API_BASE_URL}/connections/${connectionId}`, { method: 'PUT', body: JSON.stringify(updates) });
             },
             async deleteConnection(connectionId) {
                 return this._fetch(`${API_BASE_URL}/connections/${connectionId}`, { method: 'DELETE' });
@@ -1173,7 +1168,7 @@ const API_BASE_URL = 'https://soodcity.liara.run/api';
                 return;
             }
             
-            const response = await api.changePassword(currentUser.id, currentPassword, newPassword);
+            const response = await api.changePassword(currentPassword, newPassword);
 
             if (response.success) {
                 // Update current user object's password in memory for the current session
@@ -1396,7 +1391,7 @@ const API_BASE_URL = 'https://soodcity.liara.run/api';
                 return;
             }
 
-            const response = await api.updateUser(currentUser.id, { location: tempSelectedLocation });
+            const response = await api.updateUser({ location: tempSelectedLocation });
 
             if (response.success) {
                 currentUser.location = tempSelectedLocation;
@@ -1795,8 +1790,10 @@ function refreshAllMapMarkers() {
         }
 
         async function openChatWindow(recipientId, adId) {
+            const conversationId = [currentUser.id, recipientId].sort().join('-');
+            
             // Mark the conversation as read via the API
-            const response = await api.markConversationAsRead(recipientId, currentUser.id);
+            const response = await api.markConversationAsRead(conversationId);
 
             if (response.success) {
                 // The API has updated the "server" (localStorage). Now, refresh the client state.
@@ -1808,8 +1805,6 @@ function refreshAllMapMarkers() {
                     updateAllNotifications();
                 }
             }
-
-            const conversationId = [currentUser.id, recipientId].sort().join('-');
             
             if (activeChats[conversationId]) {
                 const chatWindow = document.getElementById(`chat-window-${conversationId}`);
@@ -2097,10 +2092,10 @@ function refreshAllMapMarkers() {
 
         async function deleteConversation(adId, otherPartyId, role) {
             if (confirm('آیا از حذف این گفتگو مطمئن هستید؟ تمام پیام ها پاک خواهد شد.')) {
-                const response = await api.deleteConversation(adId, otherPartyId, currentUser.id);
+                const conversationId = [currentUser.id, otherPartyId].sort().join('-');
+                const response = await api.deleteConversation(conversationId);
 
                 if (response.success) {
-                    const conversationId = [currentUser.id, otherPartyId].sort().join('-');
                     if (activeChats[conversationId]) {
                         closeChatWindow(conversationId);
                     }
