@@ -378,6 +378,7 @@
         }
 
         // Global Variables
+        let socket;
         let tabId;
         let currentUser = null; // Will be set after loading all users from storage
         let users = [];
@@ -1347,6 +1348,12 @@ const API_BASE_URL ='https://soodcity.liara.run/api';
         refreshIntervalId = null;
         console.log('Periodic refresh stopped on logout.');
     }
+
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                console.log('Socket disconnected on logout.');
+            }
 
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 navigator.serviceWorker.controller.postMessage('stop-tracking');
@@ -2342,6 +2349,40 @@ function refreshAllMapMarkers() {
                 return; 
             }
             
+            // Connect to Socket.IO
+            if (!socket && currentUser) {
+                const SOCKET_URL = 'https://soodcity.liara.run'; 
+                socket = io(SOCKET_URL, {
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 3000,
+                });
+
+                socket.on('connect', () => {
+                    console.log('✅ Connected to Socket.IO server with ID:', socket.id);
+                    socket.emit('user_connected', currentUser.id);
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('🔌 Disconnected from Socket.IO server.');
+                });
+
+                // Listen for request updates
+                socket.on('request_updated', (updatedRequest) => {
+                    console.log('📢 Received request_updated event:', updatedRequest);
+                    // Find and update the request in the local `requests` array
+                    const index = requests.findIndex(r => r.id === updatedRequest.id);
+                    if (index !== -1) {
+                        requests[index] = updatedRequest;
+                    } else {
+                        requests.push(updatedRequest);
+                    }
+                    // Refresh the UI if the user is a driver and involved in this request
+                    if (currentUser && currentUser.role === 'driver' && updatedRequest.driverId === currentUser.id) {
+                        loadDriverActiveMission();
+                    }
+                });
+            }
+
             // Update header with dynamic role icon
             const headerTitle = document.getElementById('main-header-title');
             const roleIcon = getRoleIcon(currentUser.role);
