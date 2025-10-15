@@ -954,12 +954,11 @@ const API_BASE_URL ='https://soodcity.liara.run/api';
                 return response;
             },
             async updateRequest(requestId, updates) {
+                // 🚀 PERFORMANCE: Removed full data reload.
+                // The server now pushes the single updated request via Socket.IO.
+                // The 'request_updated' socket listener will handle the UI refresh.
                 const response = await this._fetch(`${API_BASE_URL}/requests/${requestId}`, { method: 'PUT', body: JSON.stringify(updates) });
-                if (response.success) {
-                    await loadDataFromServer();
-                    loadPanelData();
-                    refreshAllMapMarkers();
-                }
+                // No client-side reload needed here anymore.
                 return response;
             },
             async deleteRequest(requestId) {
@@ -2982,8 +2981,11 @@ function refreshAllMapMarkers() {
         async function confirmSecondStep(requestId) {
             const request = requests.find(r => r.id === requestId);
             
+            // 🐛 FIX: The condition for 'full' basket was incorrect. 
+            // It should check if the driver has confirmed pickup (isPickupConfirmed),
+            // not a non-existent 'receiverAcknowledged' flag.
             const canProceed = (request.type === 'empty' && request.isPickupConfirmed) || 
-                               (request.type === 'full' && request.receiverAcknowledged);
+                               (request.type === 'full' && request.isPickupConfirmed);
 
             if (request && canProceed) {
                 const updates = {
