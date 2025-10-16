@@ -2961,7 +2961,7 @@ function refreshAllMapMarkers() {
 
                 if (response.success) {
                     showToast('تحویل با موفقیت تایید شد. ماموریت تکمیل شد.', 'success');
-                    await loadDataFromServer(); // Force refresh
+                    // await loadDataFromServer(); // Force refresh - REMOVED FOR SOCKET-BASED UPDATE
                     
                     if (currentUser.role === 'driver') {
                         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -3001,7 +3001,7 @@ function refreshAllMapMarkers() {
                 if (response.success) {
                     // Server should notify sorting center.
                     showToast('درخواست با موفقیت لغو شد.', 'success');
-                    await loadDataFromServer();
+                // await loadDataFromServer(); // REMOVED - Socket will handle the update
                     loadGreenhouseRequests();
                 } else {
                     showToast(response.message || 'خطا در لغو درخواست.', 'error');
@@ -3123,7 +3123,7 @@ function refreshAllMapMarkers() {
                 if (response.success) {
                     // Server should notify sorting center.
                     showToast('درخواست با موفقیت رد شد.', 'success');
-                    await loadDataFromServer();
+                    // await loadDataFromServer(); // REMOVED - Socket will handle the update
                     loadSortingRequests();
                     loadAvailableDrivers();
                     updateAllNotifications();
@@ -3567,7 +3567,7 @@ function refreshAllMapMarkers() {
             if (response.success) {
                 // Server should notify sorting center.
                 showToast('درخواست رد شد', 'success');
-                await loadDataFromServer();
+                // await loadDataFromServer(); // REMOVED - Socket will handle the update
                 loadDriverRequests();
             } else {
                 showToast(response.message || 'خطا در رد کردن درخواست.', 'error');
@@ -5059,7 +5059,7 @@ function refreshAllMapMarkers() {
                 if (response.success) {
                     showToast('تحویل رد شد و ماموریت‌های اصلی به حالت قبل بازگشتند.', 'info');
                     
-                    await loadDataFromServer();
+                    // await loadDataFromServer(); // REMOVED - Socket will handle the update
                     refreshAllMapMarkers();
                     loadIncomingDeliveries();
                     filterSortingReports();
