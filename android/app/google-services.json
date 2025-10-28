@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "866269558787",
+    "project_id": "soodcity",
+    "storage_bucket": "soodcity.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:866269558787:android:d03ac58eb24a782a1df636",
+        "android_client_info": {
+          "package_name": "com.Soodcity.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOOPxs87Xoj_uhrNNBKaMtpfpIYmAfY5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
