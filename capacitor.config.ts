@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
     buildOptions: {
       keystorePath: 'Soodcity.keystore',
       keystorePassword: '890326911',
-      keystoreAlias: 'my-key-alias',
+      keystoreAlias: 'soodcity',
       keystoreAliasPassword: '890326911'
     }
   },

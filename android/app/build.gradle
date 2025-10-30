@@ -1,18 +1,7 @@
 apply plugin: 'com.android.application'
-
+apply plugin: 'com.google.gms.google-services' // این خط را اضافه کنید
 android {
     namespace "com.Soodcity.myapp"
-    
-    // اینجا کد امضا را اضافه کن ↓
-    signingConfigs {
-        release {
-            storeFile file("Soodcity.keystore")
-            storePassword "890326911"
-            keyAlias "my-key-alias"
-            keyPassword "890326911"
-        }
-    }
-    
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.Soodcity.myapp"
@@ -29,8 +18,6 @@ android {
     }
     buildTypes {
         release {
-            // این خط را اضافه کن ↓
-            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
