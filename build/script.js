@@ -407,7 +407,49 @@ let isRefreshing = false; // New flag to prevent parallel refreshes
 let refreshIntervalId = null; // To hold the ID of the refresh interval
         let socket = null; // To hold the socket connection
         const orsApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImIxMGZlYjc0NjIwMzQzOWE5ZDg0OGVjZGZiMTNjZmRlIiwiaCI6Im11cm11cjY0In0=';
+        // خط 100: اضافه کردن توابع موبایل
+function isMobileApp() {
+    return window.Capacitor && window.Capacitor.isNativePlatform();
+}
 
+// تابع نوتیفیکیشن موقعیت برای موبایل
+async function sendLocationNotification() {
+    if (!isMobileApp()) return;
+    
+    try {
+        const { LocalNotifications } = Capacitor.Plugins;
+        await LocalNotifications.schedule({
+            notifications: [{
+                title: 'موقعیت مکانی به‌روز شد',
+                body: `موقعیت شما با موفقیت ثبت شد`,
+                id: new Date().getTime(),
+                schedule: { at: new Date(Date.now() + 1000) }
+            }]
+        });
+    } catch (error) {
+        console.error('خطا در نوتیفیکیشن موقعیت:', error);
+    }
+}
+
+// تابع GPS مخصوص موبایل
+function initializeMobileGPS() {
+    if (!isMobileApp() || currentUser?.role !== 'driver') return;
+    
+    const { Geolocation } = Capacitor.Plugins;
+    Geolocation.requestPermissions().then(permission => {
+        if (permission.location === 'granted') {
+            Geolocation.watchPosition({}, (position) => {
+                if (position) {
+                    const location = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    updateDriverLocation(location);
+                }
+            });
+        }
+    });
+}
         // Map layer management
         let mapLayers = {};
 
@@ -798,16 +840,18 @@ let refreshIntervalId = null; // To hold the ID of the refresh interval
        // --- API ---
 
 const API_BASE_URL ='https://soodcity.liara.run/api';
-        const api = {
-            async _fetch(url, options = {}) {
-                const token = sessionStorage.getItem('token');
-                const headers = {
-                    'Content-Type': 'application/json',
-                    ...options.headers,
-                };
-                if (token) {
-                    headers['x-auth-token'] = token
-                }
+       const api = {
+    async _fetch(url, options = {}) {
+        const token = sessionStorage.getItem('token');
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-mobile-app': (window.Capacitor && window.Capacitor.isNativePlatform()) ? 'true' : 'false',
+            ...options.headers,
+        };
+        
+        if (token) {
+            headers['x-auth-token'] = token;
+        }
 
                 try {
                     const response = await fetch(url, { ...options, headers, cache: 'no-cache' });
@@ -2312,7 +2356,7 @@ function refreshAllMapMarkers() {
             }
 
             initializePushNotifications(); // فراخوانی تابع جدید و هوشمند
-            
+            initializeMobileGPS(); // این رو دقیقا بعدش اضافه کن
             // This logic runs after the UI state is updated
             await loadDataFromServer();
 
@@ -4673,36 +4717,38 @@ function refreshAllMapMarkers() {
         // =================================================================================
         // تابع جدید و هوشمند برای مدیریت نوتیفیکیشن‌ها در وب و موبایل
         // =================================================================================
-        async function initializePushNotifications() {
-            // تشخیص اینکه آیا برنامه در محیط Capacitor اجرا می‌شود یا نه
-            const isNativePlatform = window.Capacitor && window.Capacitor.isNativePlatform();
+        // تابع کامل initializePushNotifications - آپدیت شده
+async function initializePushNotifications() {
+    const isNativePlatform = window.Capacitor && window.Capacitor.isNativePlatform();
 
-            if (isNativePlatform) {
-                // --- منطق برای اپلیکیشن موبایل (Capacitor) ---
-                console.log("📱 تشخیص محیط موبایل. تلاش برای ثبت نوتیفیکیشن نیتیو...");
-                
-                
-                // فعال‌سازی پلاگین پوش نوتیفیکیشن Capacitor
-                // نکته: این کدها در محیط مرورگر کار نمی‌کنند و باید در اپ واقعی اجرا شوند.
-                // شما باید پلاگین را نصب کرده و این کد را از حالت کامنت خارج کنید.
-                
-                const { PushNotifications } = window.Capacitor.Plugins;
+    if (isNativePlatform) {
+        console.log("📱 تشخیص محیط موبایل. تلاش برای ثبت نوتیفیکیشن نیتیو...");
+        
+        const { PushNotifications, LocalNotifications, Geolocation } = Capacitor.Plugins;
 
-                // 1. درخواست مجوز از کاربر
-                let permStatus = await PushNotifications.checkPermissions();
-                if (permStatus.receive === 'prompt') {
-                    permStatus = await PushNotifications.requestPermissions();
-                }
+        try {
+            // 1. درخواست مجوز نوتیفیکیشن محلی
+            console.log("🔔 درخواست مجوز نوتیفیکیشن محلی...");
+            const localPermission = await LocalNotifications.requestPermissions();
+            if (localPermission.receive === 'granted') {
+                console.log('✅ مجوز نوتیفیکیشن محلی داده شد');
+            } else {
+                console.log('❌ مجوز نوتیفیکیشن محلی داده نشد');
+            }
 
-                if (permStatus.receive !== 'granted') {
-                    showToast('مجوز دریافت نوتیفیکیشن داده نشد.', 'error');
-                    return;
-                }
-                
-                // 2. ثبت دستگاه در سرویس‌های پوش (FCM/APNS)
+            // 2. ثبت برای پوش نوتیفیکیشن
+            console.log("📡 ثبت برای پوش نوتیفیکیشن...");
+            let permStatus = await PushNotifications.checkPermissions();
+            
+            if (permStatus.receive === 'prompt') {
+                permStatus = await PushNotifications.requestPermissions();
+            }
+
+            if (permStatus.receive === 'granted') {
                 await PushNotifications.register();
-
-                // 3. گوش دادن به رویداد ثبت موفق
+                console.log('✅ ثبت پوش نوتیفیکیشن موفقیت‌آمیز بود');
+                
+                // گوش دادن به رویداد ثبت موفق
                 PushNotifications.addListener('registration', async (token) => {
                     console.log('✅ توکن دستگاه با موفقیت دریافت شد:', token.value);
                     // ارسال توکن به سرور
@@ -4714,57 +4760,157 @@ function refreshAllMapMarkers() {
                     }
                 });
 
-                // 4. گوش دادن به خطاهای ثبت
+                // گوش دادن به خطاهای ثبت
                 PushNotifications.addListener('registrationError', (error) => {
                     console.error('❌ خطا در ثبت نوتیفیکیشن موبایل:', error);
                     showToast('خطا در ثبت دستگاه برای دریافت نوتیفیکیشن.', 'error');
                 });
-                
+
+                // گوش دادن به دریافت نوتیفیکیشن
+                PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                    console.log('📱 نوتیفیکیشن دریافت شد:', notification);
+                    
+                    // نمایش نوتیفیکیشن محلی برای تأیید بصری
+                    LocalNotifications.schedule({
+                        notifications: [{
+                            title: notification.title || 'اعلان جدید',
+                            body: notification.body || 'پیام جدید دریافت شد',
+                            id: new Date().getTime(),
+                            schedule: { at: new Date(Date.now() + 1000) }
+                        }]
+                    });
+                });
+
+                // گوش دادن به کلیک روی نوتیفیکیشن
+                PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+                    console.log('👆 نوتیفیکیشن کلیک شد:', notification);
+                    // مدیریت ناوبری بر اساس نوع نوتیفیکیشن
+                    handleNotificationClick(notification);
+                });
 
             } else {
-                // --- منطق برای مرورگر وب (کد قبلی شما) ---
-                console.log("🌐 تشخیص محیط وب. تلاش برای ثبت نوتیفیکیشن وب...");
-                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                    console.warn('Push notifications are not supported by this browser.');
-                    return;
-                }
-
-                const registration = await navigator.serviceWorker.ready;
-                let subscription = await registration.pushManager.getSubscription();
-                
-                if (subscription || Notification.permission === 'denied') {
-                    return;
-                }
-
-                const subscribeUser = async () => {
-                    try {
-                        const vapidPublicKey = 'BNo_gideD51dMHezXPl30kAP89i16f1fqdG2hB_L5T6sT4aM7L2K2F8p1aJ_r-A-1y8a-z-H8B_y_Z-E8D9F6wY';
-                        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-                        const newSubscription = await registration.pushManager.subscribe({
-                            userVisibleOnly: true,
-                            applicationServerKey: convertedVapidKey
-                        });
-
-                        await api.subscribe(newSubscription);
-                        console.log('✅ اشتراک وب با موفقیت به سرور ارسال شد.');
-
-                    } catch (error) {
-                        console.error('❌ خطا در اشتراک نوتیفیکیشن وب:', error);
-                    }
-                };
-                
-                if (Notification.permission === 'default') {
-                    showPermissionModal({
-                        icon: '<i class="fas fa-bell text-blue-500"></i>',
-                        title: 'فعال‌سازی اعلان‌ها',
-                        body: 'برای اطلاع‌رسانی از ماموریت‌ها و پیام‌های جدید، لطفاً اجازه ارسال اعلان را به ما بدهید.',
-                        onAgree: subscribeUser
-                    });
-                }
+                console.log('❌ مجوز پوش نوتیفیکیشن داده نشد');
             }
+
+            // 3. شروع موقعیت‌یابی برای رانندگان
+            if (currentUser && currentUser.role === 'driver') {
+                console.log("📍 شروع موقعیت‌یابی برای راننده...");
+                initializeMobileGPS();
+            }
+
+        } catch (error) {
+            console.error('❌ خطا در راه‌اندازی نوتیفیکیشن موبایل:', error);
+            showToast('خطا در راه‌اندازی نوتیفیکیشن‌های موبایل', 'error');
         }
 
+    } else {
+        // --- منطق برای مرورگر وب (کد قبلی شما) ---
+        console.log("🌐 تشخیص محیط وب. تلاش برای ثبت نوتیفیکیشن وب...");
+        
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.warn('Push notifications are not supported by this browser.');
+            return;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            let subscription = await registration.pushManager.getSubscription();
+            
+            if (subscription || Notification.permission === 'denied') {
+                return;
+            }
+
+            const subscribeUser = async () => {
+                try {
+                    const vapidPublicKey = 'BNo_gideD51dMHezXPl30kAP89i16f1fqdG2hB_L5T6sT4aM7L2K2F8p1aJ_r-A-1y8a-z-H8B_y_Z-E8D9F6wY';
+                    const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+
+                    const newSubscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: convertedVapidKey
+                    });
+
+                    await api.subscribe(newSubscription);
+                    console.log('✅ اشتراک وب با موفقیت به سرور ارسال شد.');
+
+                } catch (error) {
+                    console.error('❌ خطا در اشتراک نوتیفیکیشن وب:', error);
+                }
+            };
+            
+            if (Notification.permission === 'default') {
+                showPermissionModal({
+                    icon: '<i class="fas fa-bell text-blue-500"></i>',
+                    title: 'فعال‌سازی اعلان‌ها',
+                    body: 'برای اطلاع‌رسانی از ماموریت‌ها و پیام‌های جدید، لطفاً اجازه ارسال اعلان را به ما بدهید.',
+                    onAgree: subscribeUser
+                });
+            }
+        } catch (error) {
+            console.error('❌ خطا در راه‌اندازی نوتیفیکیشن وب:', error);
+        }
+    }
+}
+
+// تابع کمکی برای مدیریت کلیک روی نوتیفیکیشن
+function handleNotificationClick(notification) {
+    const data = notification.notification.data;
+    
+    if (!data) return;
+
+    switch(data.type) {
+        case 'message':
+            // باز کردن چت مربوطه
+            if (data.senderId && data.adId) {
+                openChatWindow(data.senderId, data.adId);
+            }
+            break;
+            
+        case 'mission':
+            // نمایش ماموریت مربوطه
+            if (data.requestId) {
+                showDriverMission(data.requestId);
+            }
+            break;
+            
+        case 'location_update':
+            // تمرکز روی نقشه
+            if (data.driverId && driverMainMap) {
+                focusOnDriverOnMap(data.driverId);
+            }
+            break;
+            
+        default:
+            // رفتن به داشبورد
+            showDashboard();
+    }
+}
+
+// تابع کمکی برای تمرکز روی راننده در نقشه
+function focusOnDriverOnMap(driverId) {
+    if (!driverMainMap) return;
+    
+    const driver = users.find(u => u.id === driverId);
+    if (driver && driver.location) {
+        driverMainMap.setView([driver.location.lat, driver.location.lng], 15);
+        
+        // باز کردن پاپاپ مارکر راننده
+        if (driverMainMap.userMarkers && driverMainMap.userMarkers[driverId]) {
+            driverMainMap.userMarkers[driverId].openPopup();
+        }
+    }
+}
+
+// تابع کمکی برای نمایش ماموریت راننده
+function showDriverMission(requestId) {
+    if (currentUser && currentUser.role === 'driver') {
+        // رفتن به تب ماموریت‌های فعال
+        const activeMissionTab = document.getElementById('driver-active-mission');
+        if (activeMissionTab) {
+            activeMissionTab.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+}
         function showDisclaimerModal() {
             const modal = document.getElementById('disclaimer-modal');
             const roleTextElement = document.getElementById('disclaimer-modal-role-text');

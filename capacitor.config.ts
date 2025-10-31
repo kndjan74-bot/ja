@@ -25,6 +25,9 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
+    "Geolocation": {
+      "enableHighAccuracy": true
+    },
     // ✅ اضافه کردن پلاگین Local Notifications برای فالبک
     LocalNotifications: {
       smallIcon: "ic_stat_icon_config_sample",
