@@ -432,13 +432,29 @@ async function sendLocationNotification() {
 }
 
 // تابع GPS مخصوص موبایل
-function initializeMobileGPS() {
+async function initializeMobileGPS() {
     if (!isMobileApp() || currentUser?.role !== 'driver') return;
     
-    const { Geolocation } = Capacitor.Plugins;
-    Geolocation.requestPermissions().then(permission => {
+    try {
+        const { Geolocation } = Capacitor.Plugins;
+        
+        // بررسی وجود پلاگین
+        if (!Geolocation) {
+            console.log('❌ پلاگین Geolocation در دسترس نیست');
+            return;
+        }
+        
+        const permission = await Geolocation.requestPermissions();
         if (permission.location === 'granted') {
-            Geolocation.watchPosition({}, (position) => {
+            console.log('✅ مجوز موقعیت‌یابی داده شد');
+            
+            // شروع ردیابی موقعیت
+            Geolocation.watchPosition({}, (position, err) => {
+                if (err) {
+                    console.error('خطای GPS:', err);
+                    return;
+                }
+                
                 if (position) {
                     const location = {
                         lat: position.coords.latitude,
@@ -447,8 +463,12 @@ function initializeMobileGPS() {
                     updateDriverLocation(location);
                 }
             });
+        } else {
+            console.log('❌ مجوز موقعیت‌یابی داده نشد');
         }
-    });
+    } catch (error) {
+        console.error('خطا در راه‌اندازی GPS موبایل:', error);
+    }
 }
         // Map layer management
         let mapLayers = {};
@@ -2356,6 +2376,14 @@ function refreshAllMapMarkers() {
             }
 
             initializePushNotifications(); // فراخوانی تابع جدید و هوشمند
+
+    // داخل showMainApp بعد از initializePushNotifications();
+if (isMobileApp() && currentUser?.role === 'driver') {
+    setTimeout(() => {
+        initializeMobileGPS();
+    }, 2000); // تاخیر برای لود شدن پلاگین‌ها
+}
+
             initializeMobileGPS(); // این رو دقیقا بعدش اضافه کن
             // This logic runs after the UI state is updated
             await loadDataFromServer();
