@@ -4354,38 +4354,173 @@ if (isMobileApp() && currentUser?.role === 'driver') {
         }
 
 
-        function downloadReport(reportType) {
+       // 🔄 این کد رو کاملاً جایگزین تابع downloadReport کن
+function downloadReport(reportType) {
+    // بررسی نقش کاربر
+    const userRole = currentUser?.role;
+    const allowedReports = {
+        'greenhouse': ['greenhouse'],
+        'sorting': ['sorting'],
+        'driver': ['driver']
+    };
+
+    if (!allowedReports[reportType]?.includes(userRole)) {
+        showToast('شما مجوز دانلود این گزارش را ندارید', 'error');
+        return;
+    }
+
+    // استفاده از سرور برای دانلود
+    downloadReportFromServer(reportType);
+}
+
+// 🔄 این تابع جدید رو اضافه کن
+async function downloadReportFromServer(reportType) {
+    try {
+        showToast('در حال دریافت گزارش از سرور...', 'info');
+        
+        // جمع‌آوری پارامترهای فیلتر
+        const filterParams = getFilterParams(reportType);
+        
+        const response = await api._fetch(`${API_BASE_URL}/api/reports/${reportType}?${filterParams}`);
+
+        if (!response.success) {
+            throw new Error(response.message || 'خطا در دریافت گزارش');
+        }
+
+        // چون api._fetch جواب JSON برمی‌گرده، باید مستقیم fetch کنیم
+        const token = sessionStorage.getItem('token');
+        const actualResponse = await fetch(`${API_BASE_URL}/api/reports/${reportType}?${filterParams}`, {
+            headers: {
+                'x-auth-token': token,
+                'x-mobile-app': (window.Capacitor && window.Capacitor.isNativePlatform()) ? 'true' : 'false'
+            }
+        });
+
+        if (!actualResponse.ok) {
+            throw new Error('خطا در دریافت فایل از سرور');
+        }
+
+        // دریافت فایل CSV
+        const blob = await actualResponse.blob();
+        const fileName = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+        
+        // دانلود فایل
+        await downloadBlob(blob, fileName);
+        
+        showToast('گزارش با موفقیت دانلود شد', 'success');
+        
+    } catch (error) {
+        console.error('خطا در دانلود از سرور:', error);
+        showToast(error.message || 'خطا در دریافت گزارش از سرور', 'error');
+        
+        // Fallback به روش قدیمی
+        showToast('استفاده از روش محلی...', 'info');
+        downloadReportLocal(reportType);
+    }
+}
+
+// 🔄 این تابع جدید رو اضافه کن
+function getFilterParams(reportType) {
+    const params = new URLSearchParams();
+    
+    // تاریخ شروع و پایان
+    const startDate = document.getElementById(`${reportType}-start-date-filter`)?.value;
+    const endDate = document.getElementById(`${reportType}-end-date-filter`)?.value;
+    
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    
+    // نوع سبد
+    const basketType = document.getElementById(`${reportType}-basket-type-filter`)?.value;
+    if (basketType && basketType !== 'all') {
+        params.append('basketType', basketType);
+    }
+    
+    return params.toString();
+}
+
+// 🔄 این تابع جدید رو اضافه کن
+async function downloadBlob(blob, fileName) {
     const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
     
     if (isMobileApp) {
-        downloadReportForMobile(reportType);
+        await downloadBlobMobile(blob, fileName);
     } else {
-        downloadReportForWeb(reportType);
+        downloadBlobWeb(blob, fileName);
     }
 }
 
-// برای موبایل - بدون نیاز به نصب پکیج
-async function downloadReportForMobile(reportType) {
+// 🔄 این تابع جدید رو اضافه کن
+function downloadBlobWeb(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+// 🔄 این تابع جدید رو اضافه کن
+async function downloadBlobMobile(blob, fileName) {
     try {
-        showToast('در حال تولید گزارش...', 'info');
+        // تبدیل blob به base64
+        const base64Data = await blobToBase64(blob);
         
-        // همیشه از مرورگر دستگاه استفاده کن - ساده‌ترین روش
-        downloadReportForWeb(reportType);
+        const { Filesystem, Directory } = Capacitor.Plugins;
         
-        // نوتیفیکیشن اضافی برای موبایل
-        setTimeout(() => {
-            showToast('گزارش در مرورگر دستگاه باز شد', 'success');
-        }, 1000);
-
+        // ذخیره فایل
+        const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Documents,
+            recursive: true
+        });
+        
+        showToast(`گزارش ذخیره شد: ${fileName}`, 'success');
+        
+        // اشتراک‌گذاری
+        await shareFile(result.uri);
+        
     } catch (error) {
-        console.error('خطا در موبایل:', error);
-        // باز هم fallback به روش وب
-        downloadReportForWeb(reportType);
+        console.error('خطا در ذخیره فایل در موبایل:', error);
+        // Fallback به روش وب
+        downloadBlobWeb(blob, fileName);
     }
 }
 
-// برای وب (کد فعلی شما)
-function downloadReportForWeb(reportType) {
+// 🔄 این تابع جدید رو اضافه کن
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// 🔄 این تابع جدید رو اضافه کن
+async function shareFile(fileUri) {
+    try {
+        const { Share } = Capacitor.Plugins;
+        await Share.share({
+            title: 'گزارش سودسیتی',
+            text: 'گزارش دانلود شده از اپلیکیشن سودسیتی',
+            url: fileUri,
+            dialogTitle: 'اشتراک‌گذاری گزارش'
+        });
+    } catch (error) {
+        console.log('اشتراک‌گذاری لغو شد یا در دسترس نیست');
+    }
+}
+
+// 🔄 این تابع جدید رو اضافه کن (Fallback)
+function downloadReportLocal(reportType) {
     const tbodyId = `${reportType}-reports-body`;
     const headerIds = {
         'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
@@ -4413,14 +4548,23 @@ function downloadReportForWeb(reportType) {
     ].join('\n');
     
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const fileName = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    downloadBlob(blob, fileName);
 }
-        function downloadGreenhouseReport() { downloadReport('greenhouse'); }
-        function downloadSortingReport() { downloadReport('sorting'); }
-        function downloadDriverReport() { downloadReport('driver'); }
+
+// ✅ توابع موجود رو همینطور نگه دار (فقط منطق داخلی عوض شده)
+function downloadGreenhouseReport() { 
+    downloadReport('greenhouse');
+}
+
+function downloadSortingReport() { 
+    downloadReport('sorting');
+}
+
+function downloadDriverReport() { 
+    downloadReport('driver');
+}
 
         function downloadReportAsPDF(reportType) {
             const { jsPDF } = window.jspdf;
