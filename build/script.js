@@ -4355,39 +4355,69 @@ if (isMobileApp() && currentUser?.role === 'driver') {
 
 
         function downloadReport(reportType) {
-            const tbodyId = `${reportType}-reports-body`;
-            const headerIds = {
-                'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
-                'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
-                'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
-            };
+    const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
+    
+    if (isMobileApp) {
+        downloadReportForMobile(reportType);
+    } else {
+        downloadReportForWeb(reportType);
+    }
+}
 
-            const tbody = document.getElementById(tbodyId);
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
-                showToast('داده‌ای برای دانلود وجود ندارد', 'info');
-                return;
-            }
+// برای موبایل - بدون نیاز به نصب پکیج
+async function downloadReportForMobile(reportType) {
+    try {
+        showToast('در حال تولید گزارش...', 'info');
+        
+        // همیشه از مرورگر دستگاه استفاده کن - ساده‌ترین روش
+        downloadReportForWeb(reportType);
+        
+        // نوتیفیکیشن اضافی برای موبایل
+        setTimeout(() => {
+            showToast('گزارش در مرورگر دستگاه باز شد', 'success');
+        }, 1000);
 
-            const headers = headerIds[reportType];
-            const data = rows.map(row => {
-                const cells = Array.from(row.querySelectorAll('td'));
-                return cells.map(cell => `"${cell.textContent.trim()}"`);
-            });
+    } catch (error) {
+        console.error('خطا در موبایل:', error);
+        // باز هم fallback به روش وب
+        downloadReportForWeb(reportType);
+    }
+}
 
-            let csvContent = [
-                headers.join(','),
-                ...data.map(row => row.join(','))
-            ].join('\n');
-            
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-        }
+// برای وب (کد فعلی شما)
+function downloadReportForWeb(reportType) {
+    const tbodyId = `${reportType}-reports-body`;
+    const headerIds = {
+        'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+        'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
+        'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
+    };
 
+    const tbody = document.getElementById(tbodyId);
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
+        showToast('داده‌ای برای دانلود وجود ندارد', 'info');
+        return;
+    }
+
+    const headers = headerIds[reportType];
+    const data = rows.map(row => {
+        const cells = Array.from(row.querySelectorAll('td'));
+        return cells.map(cell => `"${cell.textContent.trim()}"`);
+    });
+
+    let csvContent = [
+        headers.join(','),
+        ...data.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+}
         function downloadGreenhouseReport() { downloadReport('greenhouse'); }
         function downloadSortingReport() { downloadReport('sorting'); }
         function downloadDriverReport() { downloadReport('driver'); }
