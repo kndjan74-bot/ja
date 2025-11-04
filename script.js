@@ -4354,217 +4354,43 @@ if (isMobileApp() && currentUser?.role === 'driver') {
         }
 
 
-       // 🔄 این کد رو کاملاً جایگزین تابع downloadReport کن
-function downloadReport(reportType) {
-    // بررسی نقش کاربر
-    const userRole = currentUser?.role;
-    const allowedReports = {
-        'greenhouse': ['greenhouse'],
-        'sorting': ['sorting'],
-        'driver': ['driver']
-    };
+        function downloadReport(reportType) {
+            const tbodyId = `${reportType}-reports-body`;
+            const headerIds = {
+                'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+                'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
+                'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
+            };
 
-    if (!allowedReports[reportType]?.includes(userRole)) {
-        showToast('شما مجوز دانلود این گزارش را ندارید', 'error');
-        return;
-    }
-
-    // استفاده از سرور برای دانلود
-    downloadReportFromServer(reportType);
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-async function downloadReportFromServer(reportType) {
-    try {
-        showToast('در حال دریافت گزارش از سرور...', 'info');
-        
-        // جمع‌آوری پارامترهای فیلتر
-        const filterParams = getFilterParams(reportType);
-        
-        const response = await api._fetch(`${API_BASE_URL}/api/reports/${reportType}?${filterParams}`);
-
-        if (!response.success) {
-            throw new Error(response.message || 'خطا در دریافت گزارش');
-        }
-
-        // چون api._fetch جواب JSON برمی‌گرده، باید مستقیم fetch کنیم
-        const token = sessionStorage.getItem('token');
-        const actualResponse = await fetch(`${API_BASE_URL}/api/reports/${reportType}?${filterParams}`, {
-            headers: {
-                'x-auth-token': token,
-                'x-mobile-app': (window.Capacitor && window.Capacitor.isNativePlatform()) ? 'true' : 'false'
+            const tbody = document.getElementById(tbodyId);
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
+                showToast('داده‌ای برای دانلود وجود ندارد', 'info');
+                return;
             }
-        });
 
-        if (!actualResponse.ok) {
-            throw new Error('خطا در دریافت فایل از سرور');
+            const headers = headerIds[reportType];
+            const data = rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('td'));
+                return cells.map(cell => `"${cell.textContent.trim()}"`);
+            });
+
+            let csvContent = [
+                headers.join(','),
+                ...data.map(row => row.join(','))
+            ].join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
         }
 
-        // دریافت فایل CSV
-        const blob = await actualResponse.blob();
-        const fileName = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-        
-        // دانلود فایل
-        await downloadBlob(blob, fileName);
-        
-        showToast('گزارش با موفقیت دانلود شد', 'success');
-        
-    } catch (error) {
-        console.error('خطا در دانلود از سرور:', error);
-        showToast(error.message || 'خطا در دریافت گزارش از سرور', 'error');
-        
-        // Fallback به روش قدیمی
-        showToast('استفاده از روش محلی...', 'info');
-        downloadReportLocal(reportType);
-    }
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-function getFilterParams(reportType) {
-    const params = new URLSearchParams();
-    
-    // تاریخ شروع و پایان
-    const startDate = document.getElementById(`${reportType}-start-date-filter`)?.value;
-    const endDate = document.getElementById(`${reportType}-end-date-filter`)?.value;
-    
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    
-    // نوع سبد
-    const basketType = document.getElementById(`${reportType}-basket-type-filter`)?.value;
-    if (basketType && basketType !== 'all') {
-        params.append('basketType', basketType);
-    }
-    
-    return params.toString();
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-async function downloadBlob(blob, fileName) {
-    const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
-    
-    if (isMobileApp) {
-        await downloadBlobMobile(blob, fileName);
-    } else {
-        downloadBlobWeb(blob, fileName);
-    }
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-function downloadBlobWeb(blob, fileName) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-async function downloadBlobMobile(blob, fileName) {
-    try {
-        // تبدیل blob به base64
-        const base64Data = await blobToBase64(blob);
-        
-        const { Filesystem, Directory } = Capacitor.Plugins;
-        
-        // ذخیره فایل
-        const result = await Filesystem.writeFile({
-            path: fileName,
-            data: base64Data,
-            directory: Directory.Documents,
-            recursive: true
-        });
-        
-        showToast(`گزارش ذخیره شد: ${fileName}`, 'success');
-        
-        // اشتراک‌گذاری
-        await shareFile(result.uri);
-        
-    } catch (error) {
-        console.error('خطا در ذخیره فایل در موبایل:', error);
-        // Fallback به روش وب
-        downloadBlobWeb(blob, fileName);
-    }
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result.split(',')[1];
-            resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-// 🔄 این تابع جدید رو اضافه کن
-async function shareFile(fileUri) {
-    try {
-        const { Share } = Capacitor.Plugins;
-        await Share.share({
-            title: 'گزارش سودسیتی',
-            text: 'گزارش دانلود شده از اپلیکیشن سودسیتی',
-            url: fileUri,
-            dialogTitle: 'اشتراک‌گذاری گزارش'
-        });
-    } catch (error) {
-        console.log('اشتراک‌گذاری لغو شد یا در دسترس نیست');
-    }
-}
-
-// 🔄 این تابع جدید رو اضافه کن (Fallback)
-function downloadReportLocal(reportType) {
-    const tbodyId = `${reportType}-reports-body`;
-    const headerIds = {
-        'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
-        'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
-        'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
-    };
-
-    const tbody = document.getElementById(tbodyId);
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    
-    if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
-        showToast('داده‌ای برای دانلود وجود ندارد', 'info');
-        return;
-    }
-
-    const headers = headerIds[reportType];
-    const data = rows.map(row => {
-        const cells = Array.from(row.querySelectorAll('td'));
-        return cells.map(cell => `"${cell.textContent.trim()}"`);
-    });
-
-    let csvContent = [
-        headers.join(','),
-        ...data.map(row => row.join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    downloadBlob(blob, fileName);
-}
-
-// ✅ توابع موجود رو همینطور نگه دار (فقط منطق داخلی عوض شده)
-function downloadGreenhouseReport() { 
-    downloadReport('greenhouse');
-}
-
-function downloadSortingReport() { 
-    downloadReport('sorting');
-}
-
-function downloadDriverReport() { 
-    downloadReport('driver');
-}
+        function downloadGreenhouseReport() { downloadReport('greenhouse'); }
+        function downloadSortingReport() { downloadReport('sorting'); }
+        function downloadDriverReport() { downloadReport('driver'); }
 
         function downloadReportAsPDF(reportType) {
             const { jsPDF } = window.jspdf;
