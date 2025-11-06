@@ -12,7 +12,6 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    // ✅ اضافه کردن تنظیمات build برای اندروید
     buildOptions: {
       keystorePath: 'Soodcity.keystore',
       keystorePassword: '890326911',
@@ -21,19 +20,32 @@ const config: CapacitorConfig = {
     }
   },
   plugins: {
-    // ✅ اضافه کردن پلاگین Push Notifications
+    // ✅ استفاده از پلاگین‌های Capacitor جدید
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
-    "Geolocation": {
-      "enableHighAccuracy": true
+    
+    // 🔥 جایگزین @ionic-native/geolocation
+    Geolocation: {
+      enableHighAccuracy: true
     },
-    // ✅ اضافه کردن پلاگین Local Notifications برای فالبک
+    
     LocalNotifications: {
       smallIcon: "ic_stat_icon_config_sample",
       iconColor: "#488AFF",
       sound: "soodcity_notification.mp3",
-    }
+    },
+    
+    // پلاگین‌های دانلود فایل
+    Filesystem: {
+      androidPermissions: [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    
+    Browser: {},
+    Share: {}
   }
 };
 

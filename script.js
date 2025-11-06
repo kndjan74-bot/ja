@@ -4354,85 +4354,248 @@ if (isMobileApp() && currentUser?.role === 'driver') {
         }
 
 
-        function downloadReport(reportType) {
-            const tbodyId = `${reportType}-reports-body`;
-            const headerIds = {
-                'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
-                'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
-                'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
-            };
+        async function downloadReport(reportType) {
+    // تشخیص محیط
+    const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
+    
+    if (isMobileApp) {
+        await downloadReportMobile(reportType);
+    } else {
+        downloadReportWeb(reportType);
+    }
+}
 
-            const tbody = document.getElementById(tbodyId);
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
-                showToast('داده‌ای برای دانلود وجود ندارد', 'info');
-                return;
-            }
+// برای وب (همان کد فعلی)
+function downloadReportWeb(reportType) {
+    const tbodyId = `${reportType}-reports-body`;
+    const headerIds = {
+        'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+        'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
+        'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
+    };
 
-            const headers = headerIds[reportType];
-            const data = rows.map(row => {
-                const cells = Array.from(row.querySelectorAll('td'));
-                return cells.map(cell => `"${cell.textContent.trim()}"`);
-            });
+    const tbody = document.getElementById(tbodyId);
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
+        showToast('داده‌ای برای دانلود وجود ندارد', 'info');
+        return;
+    }
 
-            let csvContent = [
-                headers.join(','),
-                ...data.map(row => row.join(','))
-            ].join('\n');
-            
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
+    const headers = headerIds[reportType];
+    const data = rows.map(row => {
+        const cells = Array.from(row.querySelectorAll('td'));
+        return cells.map(cell => `"${cell.textContent.trim()}"`);
+    });
+
+    let csvContent = [
+        headers.join(','),
+        ...data.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+}
+
+// برای موبایل
+async function downloadReportMobile(reportType) {
+    try {
+        const { Filesystem, Directory } = Capacitor.Plugins;
+        
+        const tbodyId = `${reportType}-reports-body`;
+        const headerIds = {
+            'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+            'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
+            'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
+        };
+
+        const tbody = document.getElementById(tbodyId);
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        if (rows.length === 0 || (rows.length === 1 && rows[0].textContent.includes("گزارشی وجود ندارد"))) {
+            showToast('داده‌ای برای دانلود وجود ندارد', 'info');
+            return;
         }
+
+        const headers = headerIds[reportType];
+        const data = rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            return cells.map(cell => `"${cell.textContent.trim()}"`);
+        });
+
+        let csvContent = [
+            headers.join(','),
+            ...data.map(row => row.join(','))
+        ].join('\n');
+
+        const fileName = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
+        
+        // ذخیره در حافظه دستگاه
+        const result = await Filesystem.writeFile({
+            path: fileName,
+            data: csvContent,
+            directory: Directory.Documents,
+            encoding: 'utf8'
+        });
+
+        showToast(`فایل در پوشه Documents ذخیره شد: ${fileName}`, 'success');
+        
+    } catch (error) {
+        console.error('خطا در دانلود موبایل:', error);
+        showToast('خطا در ذخیره فایل', 'error');
+    }
+}
 
         function downloadGreenhouseReport() { downloadReport('greenhouse'); }
         function downloadSortingReport() { downloadReport('sorting'); }
         function downloadDriverReport() { downloadReport('driver'); }
 
-        function downloadReportAsPDF(reportType) {
-            const { jsPDF } = window.jspdf;
-            const reportContainerId = `${reportType}-reports`;
-            const originalElement = document.getElementById(reportContainerId);
+        async function downloadReportAsPDF(reportType) {
+    const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
+    
+    if (isMobileApp) {
+        await downloadReportAsPDFMobile(reportType);
+    } else {
+        downloadReportAsPDFWeb(reportType);
+    }
+}
 
-            if (!originalElement || !originalElement.querySelector('tbody tr') || originalElement.querySelector('tbody tr td[colspan]')) {
-                showToast('داده‌ای برای دانلود به صورت PDF وجود ندارد', 'info');
-                return;
-            }
-            
-            const printContainer = document.createElement('div');
-            document.body.appendChild(printContainer);
-            const clone = originalElement.cloneNode(true);
-            printContainer.style.position = 'absolute';
-            printContainer.style.left = '-9999px';
-            printContainer.style.top = '0px';
-            printContainer.style.zIndex = '9999';
-            printContainer.style.backgroundColor = 'white';
-            printContainer.style.width = '1000px'; 
-            clone.style.maxHeight = 'none';
-            clone.style.overflow = 'visible';
-            printContainer.appendChild(clone);
-            
-            html2canvas(printContainer, { scale: 2, useCORS: true }).then(canvas => {
-                const imgData = canvas.toDataURL('image/png');
-                
-                const pdf = new jsPDF({
-                    orientation: 'landscape',
-                    unit: 'px',
-                    format: [canvas.width, canvas.height]
-                });
+// برای وب (کد فعلی)
+function downloadReportAsPDFWeb(reportType) {
+    const { jsPDF } = window.jspdf;
+    const reportContainerId = `${reportType}-reports`;
+    const originalElement = document.getElementById(reportContainerId);
 
-                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                
-                const today = new Date().toISOString().split('T')[0];
-                const filename = `${reportType}_report_${today}.pdf`;
-                pdf.save(filename);
+    if (!originalElement || !originalElement.querySelector('tbody tr') || originalElement.querySelector('tbody tr td[colspan]')) {
+        showToast('داده‌ای برای دانلود به صورت PDF وجود ندارد', 'info');
+        return;
+    }
+    
+    const printContainer = document.createElement('div');
+    document.body.appendChild(printContainer);
+    const clone = originalElement.cloneNode(true);
+    printContainer.style.position = 'absolute';
+    printContainer.style.left = '-9999px';
+    printContainer.style.top = '0px';
+    printContainer.style.zIndex = '9999';
+    printContainer.style.backgroundColor = 'white';
+    printContainer.style.width = '1000px'; 
+    clone.style.maxHeight = 'none';
+    clone.style.overflow = 'visible';
+    printContainer.appendChild(clone);
+    
+    html2canvas(printContainer, { scale: 2, useCORS: true }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
 
-                document.body.removeChild(printContainer);
-            });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const filename = `${reportType}_report_${today}.pdf`;
+        pdf.save(filename);
+
+        document.body.removeChild(printContainer);
+    });
+}
+
+// برای موبایل
+async function downloadReportAsPDFMobile(reportType) {
+    try {
+        const { Filesystem, Directory } = Capacitor.Plugins;
+        const { jsPDF } = window.jspdf;
+        
+        const reportContainerId = `${reportType}-reports`;
+        const originalElement = document.getElementById(reportContainerId);
+
+        if (!originalElement || !originalElement.querySelector('tbody tr') || originalElement.querySelector('tbody tr td[colspan]')) {
+            showToast('داده‌ای برای دانلود به صورت PDF وجود ندارد', 'info');
+            return;
         }
+
+        // ایجاد کانتینر برای رندر
+        const printContainer = document.createElement('div');
+        document.body.appendChild(printContainer);
+        const clone = originalElement.cloneNode(true);
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '-9999px';
+        printContainer.style.top = '0px';
+        printContainer.style.zIndex = '9999';
+        printContainer.style.backgroundColor = 'white';
+        printContainer.style.width = '1000px'; 
+        clone.style.maxHeight = 'none';
+        clone.style.overflow = 'visible';
+        printContainer.appendChild(clone);
+
+        // ایجاد PDF
+        const canvas = await html2canvas(printContainer, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        
+        // تبدیل PDF به base64
+        const pdfBase64 = pdf.output('datauristring').split(',')[1];
+        
+        const today = new Date().toISOString().split('T')[0];
+        const fileName = `${reportType}_report_${today}.pdf`;
+
+        // ذخیره در حافظه دستگاه
+        const result = await Filesystem.writeFile({
+            path: fileName,
+            data: pdfBase64,
+            directory: Directory.Documents,
+            encoding: 'base64'
+        });
+
+        // پاکسازی
+        document.body.removeChild(printContainer);
+
+        showToast(`فایل PDF در پوشه Documents ذخیره شد: ${fileName}`, 'success');
+
+        // باز کردن فایل (اختیاری)
+        try {
+            const file = await Filesystem.getUri({
+                directory: Directory.Documents,
+                path: fileName
+            });
+            
+            // باز کردن فایل با برنامه پیشفرض
+            await Capacitor.Plugins.Browser.open({ url: file.uri });
+        } catch (openError) {
+            console.log('فایل ذخیره شد اما باز نشد:', openError);
+        }
+
+    } catch (error) {
+        console.error('خطا در ایجاد PDF موبایل:', error);
+        showToast('خطا در ایجاد فایل PDF', 'error');
+    }
+}
+
+// توابع اصلی دانلود رو به این صورت به روز کن
+function downloadGreenhouseReport() { 
+    downloadReport('greenhouse'); 
+}
+
+function downloadSortingReport() { 
+    downloadReport('sorting'); 
+}
+
+function downloadDriverReport() { 
+    downloadReport('driver'); 
+}
 
 
         // Notification Functions
