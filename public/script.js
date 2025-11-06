@@ -289,7 +289,7 @@
                         <div class="flex items-center">
                             ${ad.image ? `<img src="${ad.image}" alt="${ad.product}" class="w-12 h-12 rounded-md object-cover ml-3 cursor-pointer hover:scale-105 transition-transform" onclick="showLightbox('${ad.image}')">` : `<span class="text-2xl ml-3">${ad.emoji}</span>`}
                             <div>
-                                <span class="${textColor} text-sm font-medium">${ad.product}</span>
+                                <span class="text-gray-900 text-sm font-medium">${ad.product}</span>
                                 <div class="text-xs ${subTextColor}">${ad.seller}</div>
                             </div>
                         </div>
@@ -333,7 +333,7 @@
                         <div class="flex items-center">
                             ${ad.image ? `<img src="${ad.image}" alt="${ad.product}" class="w-12 h-12 rounded-md object-cover ml-3 cursor-pointer hover:scale-105 transition-transform" onclick="showLightbox('${ad.image}')">` : `<span class="text-2xl ml-3">${ad.emoji}</span>`}
                             <div>
-                                <span class="${textColor} text-sm font-medium">${ad.product}</span>
+                                <span class="text-gray-900 text-sm font-medium">${ad.product}</span>
                                 <div class="text-xs ${subTextColor}">${ad.buyer}</div>
                             </div>
                         </div>
