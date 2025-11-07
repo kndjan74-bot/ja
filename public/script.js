@@ -4402,14 +4402,7 @@ function downloadReportWeb(reportType) {
 // برای موبایل (Excel/CSV)
 async function downloadReportMobile(reportType) {
     try {
-        console.log('📱 دانلود Excel در موبایل برای:', reportType);
-        
-        const { Share } = Capacitor.Plugins;
-        
-        if (!Share) {
-            showToast('امکان دانلود در موبایل فعال نیست', 'error');
-            return;
-        }
+        console.log('📱 دانلود در موبایل برای:', reportType);
 
         // ساخت داده‌های CSV
         const tbodyId = `${reportType}-reports-body`;
@@ -4421,54 +4414,25 @@ async function downloadReportMobile(reportType) {
             return;
         }
 
-        // ساخت هدر و داده‌ها
-        const headerIds = {
-            'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
-            'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
-            'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
-        };
-
-        const headers = headerIds[reportType];
-        let csvContent = headers.join(',') + '\n';
-        
+        let csvContent = 'تاریخ,نوع,تعداد,اطلاعات,وضعیت\n';
         rows.forEach(row => {
             const cells = Array.from(row.querySelectorAll('td'));
             const rowData = cells.map(cell => `"${cell.textContent.trim()}"`).join(',');
             csvContent += rowData + '\n';
         });
 
-        // ایجاد فایل CSV و اشتراک
-        const fileName = `${reportType}_report_${new Date().getTime()}.csv`;
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        
-        // تبدیل به data URL برای اشتراک
-        const reader = new FileReader();
-        reader.onload = async function() {
-            const dataUrl = reader.result;
-            
-            await Share.share({
-                title: `گزارش ${reportType} - Excel`,
-                text: `گزارش ${reportType} - ${new Date().toLocaleDateString('fa-IR')}`,
-                url: dataUrl,
-                dialogTitle: 'ذخیره گزارش Excel'
-            });
-        };
-        reader.readAsDataURL(blob);
-
-        showToast('گزارش Excel آماده اشتراک است', 'success');
+        // 🔥 فقط متن ساده - بدون URL
+        await Capacitor.Plugins.Share.share({
+            title: `گزارش ${reportType}`,
+            text: csvContent,
+            dialogTitle: 'ذخیره گزارش'
+        });
 
     } catch (error) {
-        console.error('❌ خطا در دانلود Excel موبایل:', error);
-        showToast('خطا در ایجاد گزارش Excel', 'error');
-    }
-}
-      async function downloadReportAsPDF(reportType) {
-    const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
-    
-    if (isMobileApp) {
-        await downloadReportAsPDFMobile(reportType);
-    } else {
-        downloadReportAsPDFWeb(reportType);
+        console.error('❌ خطا در Share:', error);
+        
+        // اگر Share خطا داد، داده رو نمایش بده
+        alert(`گزارش ${reportType}:\n\n${csvContent}\n\nمی‌توانید این متن را کپی کنید.`);
     }
 }
 
@@ -4518,68 +4482,35 @@ function downloadReportAsPDFWeb(reportType) {
 // برای موبایل (PDF)
 async function downloadReportAsPDFMobile(reportType) {
     try {
-        const { Share } = Capacitor.Plugins;
-        const { jsPDF } = window.jspdf;
-        
-        if (!Share) {
-            showToast('امکان ایجاد PDF در موبایل فعال نیست', 'error');
-            return;
-        }
-
-        // ایجاد PDF ساده
-        const pdf = new jsPDF();
-        
-        // اضافه کردن محتوای PDF
-        pdf.setFont('helvetica');
-        pdf.setFontSize(16);
-        pdf.text(`گزارش ${reportType} - سودسیتی`, 20, 20);
-        
-        pdf.setFontSize(12);
-        pdf.text(`تاریخ: ${new Date().toLocaleDateString('fa-IR')}`, 20, 40);
-        pdf.text(`کاربر: ${currentUser.fullname}`, 20, 55);
-        pdf.text(`نقش: ${getRoleTitle(currentUser.role)}`, 20, 70);
-        
-        // اضافه کردن داده‌های جدول
+        // ساخت گزارش متنی
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
         
-        let yPosition = 90;
+        if (rows.length === 0) {
+            showToast('داده‌ای برای دانلود وجود ندارد', 'info');
+            return;
+        }
+
+        let reportText = `گزارش ${reportType}\n`;
+        reportText += `تاریخ: ${new Date().toLocaleDateString('fa-IR')}\n\n`;
+        
         rows.forEach((row, index) => {
-            if (yPosition > 270) {
-                pdf.addPage();
-                yPosition = 20;
-            }
-            
             const cells = Array.from(row.querySelectorAll('td'));
             const rowText = cells.map(cell => cell.textContent.trim()).join(' | ');
-            
-            pdf.text(`${index + 1}. ${rowText}`, 20, yPosition);
-            yPosition += 10;
+            reportText += `${index + 1}. ${rowText}\n`;
         });
 
-        // ایجاد PDF و اشتراک
-        const pdfBlob = pdf.output('blob');
-        const fileName = `${reportType}_report_${new Date().getTime()}.pdf`;
-        
-        const reader = new FileReader();
-        reader.onload = async function() {
-            const dataUrl = reader.result;
-            
-            await Share.share({
-                title: `گزارش ${reportType} - PDF`,
-                text: `گزارش ${reportType} - ${new Date().toLocaleDateString('fa-IR')}`,
-                url: dataUrl,
-                dialogTitle: 'ذخیره گزارش PDF'
-            });
-        };
-        reader.readAsDataURL(pdfBlob);
-
-        showToast('گزارش PDF آماده اشتراک است', 'success');
+        // 🔥 فقط متن ساده
+        await Capacitor.Plugins.Share.share({
+            title: `گزارش ${reportType}`,
+            text: reportText,
+            dialogTitle: 'ذخیره گزارش'
+        });
 
     } catch (error) {
-        console.error('❌ خطا در ایجاد PDF موبایل:', error);
-        showToast('خطا در ایجاد گزارش PDF', 'error');
+        console.error('❌ خطا:', error);
+        alert(`گزارش ${reportType}:\n\n${reportText}`);
     }
 }
 function downloadGreenhouseReport() { 
