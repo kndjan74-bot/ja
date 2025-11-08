@@ -4356,6 +4356,8 @@ if (isMobileApp() && currentUser?.role === 'driver') {
 
      // ==================== توابع دانلود Excel ====================
 
+// ==================== توابع Excel واقعی ====================
+
 async function downloadReport(reportType) {
     const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
     
@@ -4366,9 +4368,10 @@ async function downloadReport(reportType) {
     }
 }
 
-// برای وب (Excel)
+// برای وب (Excel واقعی با SheetJS)
 function downloadReportWeb(reportType) {
     try {
+        const XLSX = window.XLSX;
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -4378,48 +4381,55 @@ function downloadReportWeb(reportType) {
             return;
         }
 
+        // ساخت هدر و داده‌ها
         const headerIds = {
-            'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
-            'sorting': ['تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع', 'تعداد', 'وضعیت'],
-            'driver': ['تاریخ', 'گلخانه', 'نوع', 'تعداد', 'وضعیت']
+            'greenhouse': ['ردیف', 'تاریخ', 'نوع سبد', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+            'sorting': ['ردیف', 'تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع سبد', 'تعداد', 'وضعیت'],
+            'driver': ['ردیف', 'تاریخ', 'گلخانه', 'نوع سبد', 'تعداد', 'وضعیت']
         };
 
         const headers = headerIds[reportType];
-        const data = rows.map(row => {
+        const data = [headers]; // سطر اول: هدرها
+        
+        // اضافه کردن داده‌ها
+        rows.forEach((row, index) => {
             const cells = Array.from(row.querySelectorAll('td'));
-            return cells.map(cell => `"${cell.textContent.trim()}"`);
+            const rowData = [
+                (index + 1).toString(), // شماره ردیف
+                ...cells.map(cell => cell.textContent.trim())
+            ];
+            data.push(rowData);
         });
 
-        let csvContent = [
-            headers.join(','),
-            ...data.map(row => row.join(','))
-        ].join('\n');
+        // ایجاد فایل Excel
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "گزارش");
         
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${reportType}_report_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
+        // تنظیم استایل برای ستون‌ها
+        const colWidths = headers.map((_, index) => ({
+            wch: Math.max(...data.map(row => row[index] ? row[index].length : 0)) + 2
+        }));
+        ws['!cols'] = colWidths;
 
+        // دانلود فایل
+        const fileName = `گزارش_${reportType}_${new Date().getTime()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
         showToast('فایل Excel دانلود شد', 'success');
 
     } catch (error) {
-        console.error('خطا در دانلود Excel:', error);
+        console.error('خطا در ایجاد Excel:', error);
         showToast('خطا در ایجاد فایل Excel', 'error');
     }
 }
 
-// برای موبایل (Excel)
+// برای موبایل (Excel واقعی)
 async function downloadReportMobile(reportType) {
     try {
-        const { Share } = Capacitor.Plugins;
-        
-        if (!Share) {
-            showToast('امکان دانلود در موبایل فعال نیست', 'error');
-            return;
-        }
+        const { Filesystem, Share, Directory } = Capacitor.Plugins;
+        const XLSX = window.XLSX;
 
-        // ساخت داده‌های CSV
+        // ساخت داده‌های Excel
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -4428,6 +4438,80 @@ async function downloadReportMobile(reportType) {
             showToast('داده‌ای برای دانلود وجود ندارد', 'info');
             return;
         }
+
+        const headerIds = {
+            'greenhouse': ['ردیف', 'تاریخ', 'نوع سبد', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
+            'sorting': ['ردیف', 'تاریخ', 'گلخانه', 'راننده', 'پلاک', 'نوع سبد', 'تعداد', 'وضعیت'],
+            'driver': ['ردیف', 'تاریخ', 'گلخانه', 'نوع سبد', 'تعداد', 'وضعیت']
+        };
+
+        const headers = headerIds[reportType];
+        const data = [headers];
+        
+        rows.forEach((row, index) => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            const rowData = [
+                (index + 1).toString(),
+                ...cells.map(cell => cell.textContent.trim())
+            ];
+            data.push(rowData);
+        });
+
+        // ایجاد workbook
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "گزارش");
+
+        // تنظیم عرض ستون‌ها
+        const colWidths = headers.map((_, index) => ({
+            wch: Math.max(...data.map(row => row[index] ? row[index].length : 0)) + 2
+        }));
+        ws['!cols'] = colWidths;
+
+        // تبدیل به base64
+        const excelBase64 = XLSX.write(wb, { 
+            type: 'base64', 
+            bookType: 'xlsx',
+            bookSST: false
+        });
+
+        // ذخیره در حافظه موبایل
+        const fileName = `گزارش_${reportType}_${new Date().getTime()}.xlsx`;
+        const result = await Filesystem.writeFile({
+            path: fileName,
+            data: excelBase64,
+            directory: Directory.Documents,
+            encoding: 'base64'
+        });
+
+        console.log('فایل ذخیره شد در:', result.uri);
+
+        // اشتراک فایل
+        await Share.share({
+            title: `گزارش ${reportType}`,
+            url: result.uri,
+            dialogTitle: 'ذخیره فایل Excel'
+        });
+
+        showToast('فایل Excel در موبایل ذخیره شد', 'success');
+
+    } catch (error) {
+        console.error('خطا در ایجاد Excel موبایل:', error);
+        // Fallback به CSV
+        await downloadReportMobileFallback(reportType);
+    }
+}
+
+// Fallback برای CSV
+async function downloadReportMobileFallback(reportType) {
+    try {
+        const { Share } = Capacitor.Plugins;
+        
+        const tbodyId = `${reportType}-reports-body`;
+        const tbody = document.getElementById(tbodyId);
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        if (rows.length === 0) return;
 
         const headerIds = {
             'greenhouse': ['تاریخ', 'نوع', 'تعداد', 'راننده', 'پلاک', 'وضعیت'],
@@ -4444,22 +4528,21 @@ async function downloadReportMobile(reportType) {
             csvContent += rowData + '\n';
         });
 
-        // استفاده از Share برای موبایل
         await Share.share({
-            title: `گزارش ${reportType}`,
+            title: `گزارش ${reportType}.csv`,
             text: csvContent,
-            dialogTitle: 'ذخیره گزارش Excel'
+            dialogTitle: 'ذخیره گزارش'
         });
 
-        showToast('گزارش Excel آماده اشتراک است', 'success');
-
     } catch (error) {
-        console.error('خطا در دانلود Excel موبایل:', error);
-        showToast('خطا در ایجاد گزارش Excel', 'error');
+        console.error('خطا در fallback:', error);
+        showToast('خطا در ایجاد گزارش', 'error');
     }
 }
 
 // ==================== توابع دانلود PDF ====================
+
+// ==================== توابع PDF واقعی ====================
 
 async function downloadReportAsPDF(reportType) {
     const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
@@ -4471,7 +4554,7 @@ async function downloadReportAsPDF(reportType) {
     }
 }
 
-// برای وب (PDF)
+// برای وب (PDF با html2canvas)
 function downloadReportAsPDFWeb(reportType) {
     try {
         const { jsPDF } = window.jspdf;
@@ -4483,33 +4566,44 @@ function downloadReportAsPDFWeb(reportType) {
             return;
         }
         
+        // ایجاد کانتینر برای رندر
         const printContainer = document.createElement('div');
         document.body.appendChild(printContainer);
+        
+        // کپی کردن المنت
         const clone = originalElement.cloneNode(true);
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0px';
         printContainer.style.zIndex = '9999';
         printContainer.style.backgroundColor = 'white';
-        printContainer.style.width = '1000px'; 
+        printContainer.style.width = '800px';
+        printContainer.style.padding = '20px';
         clone.style.maxHeight = 'none';
         clone.style.overflow = 'visible';
         printContainer.appendChild(clone);
         
-        html2canvas(printContainer, { scale: 2, useCORS: true }).then(canvas => {
+        // ایجاد PDF از HTML
+        html2canvas(printContainer, { 
+            scale: 2, 
+            useCORS: true,
+            logging: false
+        }).then(canvas => {
             const imgData = canvas.toDataURL('image/png');
             
             const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
             });
 
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const imgWidth = 210; // A4 width in mm
+            const imgHeight = canvas.height * imgWidth / canvas.width;
             
-            const today = new Date().toISOString().split('T')[0];
-            const filename = `${reportType}_report_${today}.pdf`;
-            pdf.save(filename);
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            
+            const fileName = `گزارش_${reportType}_${new Date().getTime()}.pdf`;
+            pdf.save(fileName);
 
             document.body.removeChild(printContainer);
             showToast('فایل PDF دانلود شد', 'success');
@@ -4521,85 +4615,157 @@ function downloadReportAsPDFWeb(reportType) {
     }
 }
 
-// برای موبایل (PDF)
+// برای موبایل (PDF با متن ساختاری)
 async function downloadReportAsPDFMobile(reportType) {
     try {
-        const { Share } = Capacitor.Plugins;
-        
-        if (!Share) {
-            showToast('امکان ایجاد PDF در موبایل فعال نیست', 'error');
-            return;
-        }
+        const { Filesystem, Share, Directory } = Capacitor.Plugins;
+        const { jsPDF } = window.jspdf;
 
-        // ساخت گزارش متنی ساده
+        // ایجاد PDF جدید
+        const pdf = new jsPDF();
+        
+        // هدر PDF
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(16);
+        pdf.text(`گزارش ${getRoleTitle(reportType)} - سودسیتی`, 105, 20, { align: 'center' });
+        
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`تاریخ: ${new Date().toLocaleDateString('fa-IR')}`, 20, 35);
+        pdf.text(`کاربر: ${currentUser.fullname}`, 20, 45);
+        pdf.text(`استان: ${currentUser.province}`, 20, 55);
+        
+        // خط جداکننده
+        pdf.line(20, 65, 190, 65);
+
+        // داده‌های جدول
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
         
         if (rows.length === 0) {
-            showToast('داده‌ای برای دانلود وجود ندارد', 'info');
-            return;
+            pdf.text('هیچ داده‌ای برای نمایش وجود ندارد', 20, 80);
+        } else {
+            let yPosition = 80;
+            
+            // هدر جدول
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('ردیف', 20, yPosition);
+            pdf.text('تاریخ', 40, yPosition);
+            pdf.text('اطلاعات', 80, yPosition);
+            pdf.text('تعداد', 140, yPosition);
+            pdf.text('وضعیت', 160, yPosition);
+            
+            yPosition += 8;
+            pdf.setFont('helvetica', 'normal');
+            
+            // داده‌های جدول
+            rows.forEach((row, index) => {
+                if (yPosition > 270) {
+                    pdf.addPage();
+                    yPosition = 20;
+                    
+                    // هدر جدول در صفحه جدید
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('ردیف', 20, yPosition);
+                    pdf.text('تاریخ', 40, yPosition);
+                    pdf.text('اطلاعات', 80, yPosition);
+                    pdf.text('تعداد', 140, yPosition);
+                    pdf.text('وضعیت', 160, yPosition);
+                    yPosition += 8;
+                    pdf.setFont('helvetica', 'normal');
+                }
+                
+                const cells = Array.from(row.querySelectorAll('td'));
+                
+                // شماره ردیف
+                pdf.text((index + 1).toString(), 20, yPosition);
+                
+                // داده‌ها
+                if (cells.length > 0) pdf.text(cells[0].textContent.trim(), 40, yPosition);
+                if (cells.length > 1) pdf.text(cells[1].textContent.trim(), 80, yPosition);
+                if (cells.length > 2) pdf.text(cells[2].textContent.trim(), 140, yPosition);
+                if (cells.length > 5) pdf.text(cells[5].textContent.trim(), 160, yPosition);
+                
+                yPosition += 6;
+            });
         }
+
+        // ذخیره فایل PDF
+        const pdfOutput = pdf.output('datauristring');
+        const pdfBase64 = pdfOutput.split(',')[1];
+        
+        const fileName = `گزارش_${reportType}_${new Date().getTime()}.pdf`;
+        const result = await Filesystem.writeFile({
+            path: fileName,
+            data: pdfBase64,
+            directory: Directory.Documents,
+            encoding: 'base64'
+        });
+
+        // اشتراک فایل
+        await Share.share({
+            title: `گزارش ${reportType}`,
+            url: result.uri,
+            dialogTitle: 'ذخیره فایل PDF'
+        });
+
+        showToast('فایل PDF در موبایل ذخیره شد', 'success');
+
+    } catch (error) {
+        console.error('خطا در ایجاد PDF موبایل:', error);
+        await downloadReportAsPDFMobileFallback(reportType);
+    }
+}
+
+// Fallback برای PDF متنی
+async function downloadReportAsPDFMobileFallback(reportType) {
+    try {
+        const { Share } = Capacitor.Plugins;
+        
+        const tbodyId = `${reportType}-reports-body`;
+        const tbody = document.getElementById(tbodyId);
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        if (rows.length === 0) return;
 
         let reportText = `گزارش ${reportType} - سودسیتی\n`;
         reportText += `تاریخ: ${new Date().toLocaleDateString('fa-IR')}\n`;
-        reportText += `کاربر: ${currentUser.fullname}\n`;
-        reportText += `نقش: ${getRoleTitle(currentUser.role)}\n\n`;
+        reportText += `کاربر: ${currentUser.fullname}\n\n`;
         
-        // اضافه کردن داده‌ها
         rows.forEach((row, index) => {
             const cells = Array.from(row.querySelectorAll('td'));
             const rowText = cells.map(cell => cell.textContent.trim()).join(' | ');
             reportText += `${index + 1}. ${rowText}\n`;
         });
 
-        // استفاده از Share برای موبایل
         await Share.share({
-            title: `گزارش ${reportType} - PDF`,
+            title: `گزارش ${reportType}`,
             text: reportText,
-            dialogTitle: 'ذخیره گزارش PDF'
+            dialogTitle: 'ذخیره گزارش'
         });
 
-        showToast('گزارش PDF آماده اشتراک است', 'success');
-
     } catch (error) {
-        console.error('خطا در ایجاد PDF موبایل:', error);
+        console.error('خطا در fallback PDF:', error);
         showToast('خطا در ایجاد گزارش PDF', 'error');
     }
 }
 
 // ==================== توابع فراخوانی ====================
 
-function downloadGreenhouseReport() { 
-    downloadReport('greenhouse'); 
-}
+function downloadGreenhouseReport() { downloadReport('greenhouse'); }
+function downloadSortingReport() { downloadReport('sorting'); }
+function downloadDriverReport() { downloadReport('driver'); }
 
-function downloadSortingReport() { 
-    downloadReport('sorting'); 
-}
+function downloadGreenhousePDF() { downloadReportAsPDF('greenhouse'); }
+function downloadSortingPDF() { downloadReportAsPDF('sorting'); }
+function downloadDriverPDF() { downloadReportAsPDF('driver'); }
 
-function downloadDriverReport() { 
-    downloadReport('driver'); 
-}
-
-function downloadGreenhousePDF() { 
-    downloadReportAsPDF('greenhouse'); 
-}
-
-function downloadSortingPDF() { 
-    downloadReportAsPDF('sorting'); 
-}
-
-function downloadDriverPDF() { 
-    downloadReportAsPDF('driver'); 
-}
-
-// ==================== تابع کمکی ====================
-
+// تابع کمکی
 function getRoleTitle(role) {
     const titles = {
-        greenhouse: 'گلخانه‌دار',
-        sorting: 'مرکز سورتینگ',
+        greenhouse: 'گلخانه',
+        sorting: 'سورتینگ', 
         driver: 'راننده',
         farmer: 'کشاورز',
         buyer: 'خریدار'
