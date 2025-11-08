@@ -38,10 +38,6 @@ const config: CapacitorConfig = {
     
     // پلاگین‌های دانلود فایل
     Filesystem: {
-      androidPermissions: [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
     },
     
     Browser: {},
