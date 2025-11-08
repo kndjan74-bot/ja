@@ -4357,7 +4357,6 @@ if (isMobileApp() && currentUser?.role === 'driver') {
      // ==================== توابع دانلود Excel ====================
 
 // ==================== توابع Excel واقعی ====================
-
 async function downloadReport(reportType) {
     const isMobileApp = window.Capacitor && window.Capacitor.isNativePlatform();
     
@@ -4426,7 +4425,7 @@ function downloadReportWeb(reportType) {
 // برای موبایل (Excel واقعی)
 async function downloadReportMobile(reportType) {
     try {
-        const { Filesystem, Share, Directory } = Capacitor.Plugins;
+        const { Filesystem, Share } = Capacitor.Plugins;
         const XLSX = window.XLSX;
 
         // ساخت داده‌های Excel
@@ -4480,7 +4479,7 @@ async function downloadReportMobile(reportType) {
         const result = await Filesystem.writeFile({
             path: fileName,
             data: excelBase64,
-            directory: Directory.Documents,
+            directory: Filesystem.Directory.Documents,
             encoding: 'base64'
         });
 
@@ -4618,7 +4617,7 @@ function downloadReportAsPDFWeb(reportType) {
 // برای موبایل (PDF با متن ساختاری)
 async function downloadReportAsPDFMobile(reportType) {
     try {
-        const { Filesystem, Share, Directory } = Capacitor.Plugins;
+        const { Filesystem, Share } = Capacitor.Plugins;
         const { jsPDF } = window.jspdf;
 
         // ایجاد PDF جدید
@@ -4699,7 +4698,7 @@ async function downloadReportAsPDFMobile(reportType) {
         const result = await Filesystem.writeFile({
             path: fileName,
             data: pdfBase64,
-            directory: Directory.Documents,
+            directory: Filesystem.Directory.Documents,
             encoding: 'base64'
         });
 
@@ -4772,6 +4771,7 @@ function getRoleTitle(role) {
     };
     return titles[role] || role;
 }
+
 
         // Notification Functions
         function updateNotificationBadge() {
