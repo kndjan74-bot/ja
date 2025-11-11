@@ -4425,7 +4425,6 @@ function downloadReportWeb(reportType) {
 // برای موبایل (Excel واقعی)
 async function downloadReportMobile(reportType) {
     try {
-        const { Filesystem, Share } = Capacitor.Plugins;
         const XLSX = window.XLSX;
 
         // ساخت داده‌های Excel
@@ -4476,17 +4475,17 @@ async function downloadReportMobile(reportType) {
 
         // ذخیره در حافظه موبایل
         const fileName = `گزارش_${reportType}_${new Date().getTime()}.xlsx`;
-        const result = await Filesystem.writeFile({
+        const result = await Capacitor.Plugins.Filesystem.writeFile({
             path: fileName,
             data: excelBase64,
-            directory: Filesystem.Directory.Documents,
+            directory: Capacitor.Plugins.Filesystem.Directory.Documents,
             encoding: 'base64'
         });
 
         console.log('فایل ذخیره شد در:', result.uri);
 
         // اشتراک فایل
-        await Share.share({
+        await Capacitor.Plugins.Share.share({
             title: `گزارش ${reportType}`,
             url: result.uri,
             dialogTitle: 'ذخیره فایل Excel'
@@ -4504,8 +4503,6 @@ async function downloadReportMobile(reportType) {
 // Fallback برای CSV
 async function downloadReportMobileFallback(reportType) {
     try {
-        const { Share } = Capacitor.Plugins;
-        
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -4527,7 +4524,7 @@ async function downloadReportMobileFallback(reportType) {
             csvContent += rowData + '\n';
         });
 
-        await Share.share({
+        await Capacitor.Plugins.Share.share({
             title: `گزارش ${reportType}.csv`,
             text: csvContent,
             dialogTitle: 'ذخیره گزارش'
@@ -4617,7 +4614,6 @@ function downloadReportAsPDFWeb(reportType) {
 // برای موبایل (PDF با متن ساختاری)
 async function downloadReportAsPDFMobile(reportType) {
     try {
-        const { Filesystem, Share } = Capacitor.Plugins;
         const { jsPDF } = window.jspdf;
 
         // ایجاد PDF جدید
@@ -4695,15 +4691,15 @@ async function downloadReportAsPDFMobile(reportType) {
         const pdfBase64 = pdfOutput.split(',')[1];
         
         const fileName = `گزارش_${reportType}_${new Date().getTime()}.pdf`;
-        const result = await Filesystem.writeFile({
+        const result = await Capacitor.Plugins.Filesystem.writeFile({
             path: fileName,
             data: pdfBase64,
-            directory: Filesystem.Directory.Documents,
+            directory: Capacitor.Plugins.Filesystem.Directory.Documents,
             encoding: 'base64'
         });
 
         // اشتراک فایل
-        await Share.share({
+        await Capacitor.Plugins.Share.share({
             title: `گزارش ${reportType}`,
             url: result.uri,
             dialogTitle: 'ذخیره فایل PDF'
@@ -4720,8 +4716,6 @@ async function downloadReportAsPDFMobile(reportType) {
 // Fallback برای PDF متنی
 async function downloadReportAsPDFMobileFallback(reportType) {
     try {
-        const { Share } = Capacitor.Plugins;
-        
         const tbodyId = `${reportType}-reports-body`;
         const tbody = document.getElementById(tbodyId);
         const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -4738,7 +4732,7 @@ async function downloadReportAsPDFMobileFallback(reportType) {
             reportText += `${index + 1}. ${rowText}\n`;
         });
 
-        await Share.share({
+        await Capacitor.Plugins.Share.share({
             title: `گزارش ${reportType}`,
             text: reportText,
             dialogTitle: 'ذخیره گزارش'
